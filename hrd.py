@@ -1,4 +1,5 @@
 import sys
+from copy import deepcopy
 import pygame
 from pygame.locals import *
 
@@ -16,6 +17,42 @@ WHITE = (255, 255, 255)
 movable_heros = []
 
 
+class HStatus:
+    def __init__(self, game_box: list):
+        self.status = deepcopy(game_box)
+        self.next_status = []
+
+    def __eq__(self, other):
+        if self.status == other.status:
+            return True
+        else:
+            return False
+
+    def print_info(self):
+        for each in self.status:
+            print(each)
+        for each in self.next_status:
+            for i in each:
+                print(i)
+
+    def _move_by_name(self, name: str, direction: str):
+        temp = deepcopy(self.status)
+        for hero in temp:
+            if hero.name == name:
+                hero.move(direction)
+        return temp
+
+    def get_nextstatus(self) -> list:
+        for hero in self.status:
+            print(hero.name)
+            if hero.movable:
+                for next_move in hero.movable:
+                    print(next_move)
+                    self.next_status.append(self._move_by_name(hero.name, next_move))
+
+        return self.next_status
+
+
 class Hero:
     def __init__(self, pos: tuple, size: tuple,  _color: tuple, name):
         self.unit = 80
@@ -23,6 +60,15 @@ class Hero:
         self.name = name
         self.rect = pygame.Rect((pos[0]*self.unit, pos[1]*self.unit), (size[0]*self.unit, size[1]*self.unit))
         self.movable = []
+
+    def __eq__(self, other):
+        if self.rect == other.rect and self.name == other.name:
+            return True
+        else:
+            return False
+
+    def __str__(self):
+        return str({'name': self.name, 'rect': self.rect})
 
     def move(self, direction: str):
         if direction == 'r':
@@ -44,12 +90,12 @@ class Hero:
                                self.rect.centery-text_fmt.get_rect().height/2))
 
 
-def movable_check_1d(heros: list, direction: str, screen: pygame.Surface):
+def movable_check_1d(game_box: list, direction: str, screen: pygame.Surface):
     """检查可以移动的英雄(针对某一个方向), 并将每个英雄可移动的方向添加到英雄的属性中"""
     flag = 0
-    for hero in heros:
-        _index = heros.index(hero)
-        temp_hero = heros.pop(_index)  # 取出一个英雄
+    for hero in game_box:
+        _index = game_box.index(hero)
+        temp_hero = game_box.pop(_index)  # 取出一个英雄
         # after move still in screen and not collided with others
         temp_rect = None
         temp_rect_r = pygame.Rect.move(temp_hero.rect, temp_hero.unit, 0)
@@ -65,7 +111,7 @@ def movable_check_1d(heros: list, direction: str, screen: pygame.Surface):
         elif direction == 'd':
             temp_rect = temp_rect_d
 
-        for each in heros:  # 与未取出的进行碰撞比较
+        for each in game_box:  # 与未取出的进行碰撞比较
             if each.rect.colliderect(temp_rect):
                 # 如果这个英雄移动后发生碰撞, 则跳过
                 flag = 1
@@ -76,25 +122,25 @@ def movable_check_1d(heros: list, direction: str, screen: pygame.Surface):
             # 并且, 将这个可移动的英雄记录下来
             temp_hero.movable.append(direction)
             movable_heros.append(temp_hero)
-        heros.insert(_index, temp_hero)  # 放回英雄
+        game_box.insert(_index, temp_hero)  # 放回英雄
         flag = 0
 
 
-def movable_check_4d(heros: list, screen: pygame.Surface):
+def movable_check_4d(game_box: list, screen: pygame.Surface):
     """检查可以移动的英雄(针对四个方向), 并将每个英雄可移动的方向添加到英雄的属性中"""
     directions = ['d', 'l', 'u', 'r']
     # 先清除每个英雄可移动的方向
-    for hero in heros:
+    for hero in game_box:
         hero.movable.clear()
     # 再清除所有可移动英雄
     movable_heros.clear()
 
     for direction in directions:
-        movable_check_1d(heros, direction, screen)
+        movable_check_1d(game_box, direction, screen)
 
 
-def print_info(heros: list):
-    for hero in heros:
+def print_info(game_box: list):
+    for hero in game_box:
         print(hero.name, hero.movable)
 
 
@@ -129,9 +175,10 @@ def main():
     b = Hero((1, 3), (1, 1), GREEN2, '乙7')
     c = Hero((2, 3), (1, 1), YELLOW2, '丙8')
     d = Hero((3, 4), (1, 1), RED3, '丁9')
-    heros = [cc, zy, mc, hz, gy, zf, a, b, c, d]
+    game_box = [cc, zy, mc, hz, gy, zf, a, b, c, d]
+    # game_box2 = [zy, zy, mc, hz, gy, zf, a, b, c, d]
     hero_index = 0
-
+    # print(game_box == game_box2)
     run = True
     while run:
         for event in pygame.event.get():
@@ -139,28 +186,30 @@ def main():
                 pygame.quit()
                 sys.exit()
             if event.type == KEYDOWN:
-                movable_check_4d(heros, screen)
+                movable_check_4d(game_box, screen)
                 # print_info(heros)
-                if event.key == K_DOWN and 'd' in heros[hero_index].movable:
-                    heros[hero_index].move('d')
-                elif event.key == K_UP and 'u' in heros[hero_index].movable:
-                    heros[hero_index].move('u')
-                elif event.key == K_LEFT and 'l' in heros[hero_index].movable:
-                    heros[hero_index].move('l')
-                elif event.key == K_RIGHT and 'r' in heros[hero_index].movable:
-                    heros[hero_index].move('r')
+                if event.key == K_DOWN and 'd' in game_box[hero_index].movable:
+                    game_box[hero_index].move('d')
+                elif event.key == K_UP and 'u' in game_box[hero_index].movable:
+                    game_box[hero_index].move('u')
+                elif event.key == K_LEFT and 'l' in game_box[hero_index].movable:
+                    game_box[hero_index].move('l')
+                elif event.key == K_RIGHT and 'r' in game_box[hero_index].movable:
+                    game_box[hero_index].move('r')
                 elif event.key == K_z:
                     if hero_index == 9:
                         hero_index = 0
                     hero_index += 1
                     print(hero_index)
                 elif event.key == K_SPACE:
-                    movable_check_4d(heros, screen)
-                    print_info(heros)
-                    deep_first_search(movable_heros)
+                    movable_check_4d(game_box, screen)
+                    ss = HStatus(game_box)
+                    ss.get_nextstatus()
+                    ss.print_info()
+                    print_info(game_box)
 
         screen.fill(WHITE)
-        for hero in heros:
+        for hero in game_box:
             hero.draw(screen)
         pygame.display.flip()
         clock.tick(10)
