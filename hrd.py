@@ -18,6 +18,11 @@ movable_heros = []
 
 
 class HStatus:
+    """存储当前棋盘状态， 并获取下一步所有可能的状态。
+    初始化参数：某个棋盘状态。
+    初始化之前，一定要先调用movable_check_4d更新每个英雄的可移动列表。
+    初始化之后，需要调用get_nextstatus才能获取到接下来的状态。"""
+
     def __init__(self, game_box: list):
         self.status = deepcopy(game_box)
         self.next_status = []
@@ -29,6 +34,7 @@ class HStatus:
             return False
 
     def print_info(self):
+        """输出当前棋盘状态和所有下一步状态， 测试用"""
         for each in self.status:
             print(each)
         for each in self.next_status:
@@ -36,6 +42,7 @@ class HStatus:
                 print(i)
 
     def _move_by_name(self, name: str, direction: str):
+        """根据名字和方向， 移动某一个英雄"""
         temp = deepcopy(self.status)
         for hero in temp:
             if hero.name == name:
@@ -43,22 +50,25 @@ class HStatus:
         return temp
 
     def get_nextstatus(self) -> list:
+        """根据当前棋盘状态， 获取所有下一步可能状态"""
         for hero in self.status:
-            print(hero.name)
+            # print(hero.name)
             if hero.movable:
                 for next_move in hero.movable:
-                    print(next_move)
+                    # print(next_move)
                     self.next_status.append(self._move_by_name(hero.name, next_move))
 
         return self.next_status
 
 
 class Hero:
-    def __init__(self, pos: tuple, size: tuple,  _color: tuple, name):
+    """英雄类"""
+
+    def __init__(self, pos: tuple, size: tuple, _color: tuple, name):
         self.unit = 80
         self.color = _color
         self.name = name
-        self.rect = pygame.Rect((pos[0]*self.unit, pos[1]*self.unit), (size[0]*self.unit, size[1]*self.unit))
+        self.rect = pygame.Rect((pos[0] * self.unit, pos[1] * self.unit), (size[0] * self.unit, size[1] * self.unit))
         self.movable = []
 
     def __eq__(self, other):
@@ -86,8 +96,8 @@ class Hero:
         pygame.draw.rect(screen, self.color, self.rect, 0)
         text = pygame.font.SysFont('华文仿宋', 15)
         text_fmt = text.render(self.name, True, (0, 0, 0))
-        screen.blit(text_fmt, (self.rect.centerx-text_fmt.get_rect().width/2,
-                               self.rect.centery-text_fmt.get_rect().height/2))
+        screen.blit(text_fmt, (self.rect.centerx - text_fmt.get_rect().width / 2,
+                               self.rect.centery - text_fmt.get_rect().height / 2))
 
 
 def movable_check_1d(game_box: list, direction: str, screen: pygame.Surface):
@@ -144,27 +154,52 @@ def print_info(game_box: list):
         print(hero.name, hero.movable)
 
 
-def deep_first_search(movable_heros: list):
-    stack = []
-    taged = False
-    # 入栈判断:未在栈中,并且不是刚刚移动过的英雄,则入栈
-    for each in movable_heros:
-        if each not in stack and not taged:
-            stack.append(each)
+def deep_first_search(game_box: list, screen: pygame.Surface):
+    """深度优先搜索，解谜华容道"""
+    stack = [[], []]  # 状态栈[[状态][深度]], 左低右顶
+    record = [[], []]  # 出栈记录， 用于回溯
+    deep = 0  # 搜索深度
+    flag = 0
+    movable_check_4d(game_box, screen)
+    current_status = game_box
+    while True:
+        current_status = HStatus(current_status)
+        movable_check_4d(current_status.status, screen)
+        next_status = current_status.get_nextstatus()
+        temp = []
+        for s in next_status:
+            if s not in stack[0] and s not in record[0]:
+                temp.append(s)
+                flag = 1  # 发生入栈
+            else:
+                print('有重复！')
+        if flag:
+            # 如果发生入栈
+            flag = 0
+            if deep + 1 <= 300:
+                deep += 1
+                print('入栈！', deep)
+                for t in temp:
+                    stack[0].append(t)
+                    stack[1].append(deep)
 
-    for each in stack:
-        print('在栈中', each.name)
+        current_status = stack[0].pop()
+        record[0].append(current_status)
+        record[1].append(deep)
+        deep = stack[1].pop()
+        print('出栈！', deep)
+        print(len(record[0]), len(record[1]), len(stack[0]), len(stack[1]))
+        yield current_status
 
 
 def main():
-
+    # 一些初始化
     pygame.init()
     pygame.font.init()
     screen = pygame.display.set_mode((320, 400))
     pygame.display.set_caption('华容道')
-
     clock = pygame.time.Clock()
-
+    # 英雄
     cc = Hero((1, 0), (2, 2), RED, '曹操0')
     zy = Hero((0, 0), (1, 2), GREEN, '赵云1')
     mc = Hero((3, 0), (1, 2), BLUE, '马超2')
@@ -175,10 +210,10 @@ def main():
     b = Hero((1, 3), (1, 1), GREEN2, '乙7')
     c = Hero((2, 3), (1, 1), YELLOW2, '丙8')
     d = Hero((3, 4), (1, 1), RED3, '丁9')
-    game_box = [cc, zy, mc, hz, gy, zf, a, b, c, d]
-    # game_box2 = [zy, zy, mc, hz, gy, zf, a, b, c, d]
-    hero_index = 0
-    # print(game_box == game_box2)
+    game_box = [cc, zy, mc, hz, gy, zf, a, b, c, d]  # 棋盘
+    hero_index = 0  # 当前英雄序号
+    game_box = deep_first_search(game_box, screen)
+    # 主循环
     run = True
     while run:
         for event in pygame.event.get():
@@ -186,7 +221,7 @@ def main():
                 pygame.quit()
                 sys.exit()
             if event.type == KEYDOWN:
-                movable_check_4d(game_box, screen)
+                # movable_check_4d(game_box, screen)
                 # print_info(heros)
                 if event.key == K_DOWN and 'd' in game_box[hero_index].movable:
                     game_box[hero_index].move('d')
@@ -199,20 +234,20 @@ def main():
                 elif event.key == K_z:
                     if hero_index == 9:
                         hero_index = 0
-                    hero_index += 1
-                    print(hero_index)
+                    else:
+                        hero_index += 1
+                    print('当前英雄序号：', hero_index)
                 elif event.key == K_SPACE:
-                    movable_check_4d(game_box, screen)
-                    ss = HStatus(game_box)
-                    ss.get_nextstatus()
-                    ss.print_info()
-                    print_info(game_box)
+                    pass
 
         screen.fill(WHITE)
-        for hero in game_box:
+        for hero in next(game_box):
             hero.draw(screen)
+            if hero.name == '丁9' and hero.rect.topleft == (0, 320):
+                pygame.quit()
+                sys.exit()
         pygame.display.flip()
-        clock.tick(10)
+        clock.tick(3)
 
 
 if __name__ == '__main__':
